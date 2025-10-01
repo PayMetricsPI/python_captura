@@ -1,5 +1,7 @@
 import psutil, datetime, time, pandas as pd, os, platform
 
+num_cpus = psutil.cpu_count(logical=True)
+
 while True:
 
     print(r"""  ____            _                         _      
@@ -37,9 +39,29 @@ while True:
     timestamp = time.time()
     data_formatada = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
-    codigo_maquina="COD001"
+    codigo_maquina="COD004"
 
-    valores = {
+    data_process_csv = {
+        "timestamp": [],
+        "pid": [],
+        "process": [],
+        "username": [],
+        "cpu_percent": [],
+        "ram_megabytes": []
+    }
+
+    for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info']):
+        data_process_csv['pid'].append(proc.info['pid'])
+        # é necessario dividir o consumo em porcentagem pela quantidade de vcpus
+        data_process_csv['cpu_percent'].append(proc.cpu_percent(interval=0.1) / num_cpus)
+        data_process_csv['process'].append(proc.info['name'])
+        data_process_csv['username'].append(proc.info['username'])
+        # vms -> virtual memory size
+        data_process_csv['ram_megabytes'].append(proc.info['memory_info'].vms / 1024 / 1024)
+        data_process_csv['timestamp'].append(data_formatada)
+
+
+    geral = {
         "datetime": [data_formatada],
         "codigo_maquina": [codigo_maquina],
         "mac_address": [mac_Ethernet],
@@ -50,11 +72,19 @@ while True:
         "mb_recebidos": [round(bytes_recebidos,3)],
         "processos_ativos": [active_processes]   
     }
+
     
-    df = pd.DataFrame(valores)
+    df = pd.DataFrame(geral)
+    df_processes = pd.DataFrame(data_process_csv)
+
     if os.path.exists("DadosHardware.csv"):
         df.to_csv("DadosHardware.csv", sep= ';', mode= 'a', index=False, header=False)
     else:
         df.to_csv("DadosHardware.csv", index=False, sep= ';')
-    
+
+    if os.path.exists("Processos.csv"):
+        df_processes.to_csv("Processos.csv", sep=";", mode="a", index=False, header=False)
+    else:
+        df_processes.to_csv("Processos.csv", index=False, sep=';')
+
     time.sleep(5)
