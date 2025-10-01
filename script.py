@@ -42,23 +42,19 @@ while True:
     codigo_maquina="COD004"
 
     data_process_csv = {
-        "timestamp": [],
+        "datetime": [],
         "pid": [],
         "process": [],
         "username": [],
-        "cpu_percent": [],
-        "ram_megabytes": []
+        "ram": []
     }
 
-    for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_info']):
+    for proc in psutil.process_iter(['pid', 'name', 'username', 'memory_info']):
         data_process_csv['pid'].append(proc.info['pid'])
-        # é necessario dividir o consumo em porcentagem pela quantidade de vcpus
-        data_process_csv['cpu_percent'].append(proc.cpu_percent(interval=0.1) / num_cpus)
         data_process_csv['process'].append(proc.info['name'])
         data_process_csv['username'].append(proc.info['username'])
-        # vms -> virtual memory size
-        data_process_csv['ram_megabytes'].append(proc.info['memory_info'].vms / 1024 / 1024)
-        data_process_csv['timestamp'].append(data_formatada)
+        data_process_csv['ram'].append(proc.info['memory_info'].vms / 1024 / 1024)
+        data_process_csv['datetime'].append(data_formatada)
 
 
     geral = {
@@ -66,8 +62,8 @@ while True:
         "codigo_maquina": [codigo_maquina],
         "mac_address": [mac_Ethernet],
         "cpu": [psutil.cpu_percent(interval=1)],
-        "ram_usada": [psutil.virtual_memory().percent],
-        "uso_disco": [(psutil.disk_usage('/').percent)],
+        "ram": [psutil.virtual_memory().percent],
+        "disco": [(psutil.disk_usage('/').percent)],
         "mb_enviados": [round(bytes_enviados,3)],
         "mb_recebidos": [round(bytes_recebidos,3)],
         "processos_ativos": [active_processes]   
