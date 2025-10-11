@@ -143,7 +143,7 @@ while True:
 
                 if enviado_para_bucket:
                     enviado_para_bucket = False
-                    upload_file(file_name="processes-csvs/"+nome_arquivo_processos, bucket=NOME_BUCKET, object_name="processes/"+nome_arquivo_hardware)
+                    upload_file(file_name="processes-csvs/"+nome_arquivo_processos, bucket=NOME_BUCKET, object_name="processes/"+nome_arquivo_processos)
                     nome_arquivo_processos = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
             else:
                 df_processes.to_csv("processes-csvs/"+nome_arquivo_processos, index=False, sep=';')
