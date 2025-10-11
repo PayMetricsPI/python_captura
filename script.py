@@ -1,13 +1,29 @@
-import psutil, datetime, time, pandas as pd, os, platform
+import psutil
+from datetime import datetime
+import time
+import pandas as pd
+import platform
+import os
 from random import randint, gauss, uniform
+from bucket import upload_file
 
-CODIGO_MAQUINA = "<insira o codigo da máquina>"
+CODIGO_MAQUINA = "<insira o código da máquina>"
+
 QTD_MAX_LINHAS = 100  # -1 para infinito
 SIMULAR_REGRA_NEGOCIO = True
 CAPTURAR_PROCESSOS = False
 
-num_cpus = psutil.cpu_count(logical=True)
+ENVIAR_PARA_BUCKET = True
+ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS = 20
+NOME_BUCKET = "raw-paymetrics"
+
 qtd_linha_atual = 0
+
+nome_arquivo_hardware = f"hardware-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
+nome_arquivo_processos = f"processes-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
+
+if not os.path.exists("hardware-csvs"): os.mkdir("hardware-csvs")
+if not os.path.exists("processes-csvs") and CAPTURAR_PROCESSOS: os.mkdir("processes-csvs")
 
 while True:
     if qtd_linha_atual >= QTD_MAX_LINHAS and QTD_MAX_LINHAS != -1:
@@ -32,7 +48,7 @@ while True:
     """)
 
     rede_antiga = psutil.net_io_counters()
-    
+
     time.sleep(5)
     rede_nova = psutil.net_io_counters()
 
@@ -52,7 +68,7 @@ while True:
                     mac_address = espec.address
 
     timestamp = time.time()
-    data_formatada = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    data_formatada = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
     data_process_csv = {"datetime": [], "pid": [], "process": [], "username": [], "ram": []}
 
     if CAPTURAR_PROCESSOS:
@@ -108,18 +124,31 @@ while True:
     if CAPTURAR_PROCESSOS:
         df_processes = pd.DataFrame(data_process_csv)
 
+    enviado_para_bucket=False
     try:
-        if os.path.exists(f"{CODIGO_MAQUINA}-hardware.csv"):
-            df.to_csv(f"{CODIGO_MAQUINA}-hardware.csv", sep=';', mode='a', index=False, header=False)
+        if os.path.exists(nome_arquivo_hardware):
+            df.to_csv(nome_arquivo_hardware, sep=';', mode='a', index=False, header=False)
+
+            if ENVIAR_PARA_BUCKET and ((qtd_linha_atual+1) % ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS == 0):
+                print("Enviando para o Bucket...")
+                upload_file(file_name=nome_arquivo_hardware, bucket=NOME_BUCKET)
+                nome_arquivo_hardware = f"hardware-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
+                enviado_para_bucket = True
         else:
-            df.to_csv(f"{CODIGO_MAQUINA}-hardware.csv", index=False, sep=';')
+            df.to_csv(nome_arquivo_hardware, index=False, sep=';')
 
         if CAPTURAR_PROCESSOS:
-            if os.path.exists(f"{CODIGO_MAQUINA}-processes.csv"):
-                df_processes.to_csv(f"{CODIGO_MAQUINA}-processes.csv", sep=";", mode="a", index=False, header=False)
+            if os.path.exists(nome_arquivo_processos):
+                df_processes.to_csv(nome_arquivo_processos, sep=";", mode="a", index=False, header=False)
+
+                if enviado_para_bucket:
+                    enviado_para_bucket = False
+                    upload_file(file_name=nome_arquivo_processos, bucket=NOME_BUCKET)
+                    nome_arquivo_processos = f"processes-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
             else:
-                df_processes.to_csv(f"{CODIGO_MAQUINA}-processes.csv", index=False, sep=';')
-    except(OSError):
+                df_processes.to_csv(nome_arquivo_processos, index=False, sep=';')
+    except OSError as e:
+        print(e)
         print("INSIRA O CÓDIGO DA MÁQUINA CORRETAMENTE!!!")
         break
 
