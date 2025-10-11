@@ -11,7 +11,7 @@ CODIGO_MAQUINA = "<insira o código da máquina>"
 
 QTD_MAX_LINHAS = 100  # -1 para infinito
 SIMULAR_REGRA_NEGOCIO = True
-CAPTURAR_PROCESSOS = False
+CAPTURAR_PROCESSOS = True
 
 ENVIAR_PARA_BUCKET = True
 ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS = 20
@@ -19,8 +19,8 @@ NOME_BUCKET = "raw-paymetrics"
 
 qtd_linha_atual = 0
 
-nome_arquivo_hardware = f"hardware-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
-nome_arquivo_processos = f"processes-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
+nome_arquivo_hardware = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
+nome_arquivo_processos = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
 
 if not os.path.exists("hardware-csvs"): os.mkdir("hardware-csvs")
 if not os.path.exists("processes-csvs") and CAPTURAR_PROCESSOS: os.mkdir("processes-csvs")
@@ -126,27 +126,27 @@ while True:
 
     enviado_para_bucket=False
     try:
-        if os.path.exists(nome_arquivo_hardware):
-            df.to_csv(nome_arquivo_hardware, sep=';', mode='a', index=False, header=False)
+        if os.path.exists("hardware-csvs/"+nome_arquivo_hardware):
+            df.to_csv("hardware-csvs/"+nome_arquivo_hardware, sep=';', mode='a', index=False, header=False)
 
             if ENVIAR_PARA_BUCKET and ((qtd_linha_atual+1) % ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS == 0):
                 print("Enviando para o Bucket...")
-                upload_file(file_name=nome_arquivo_hardware, bucket=NOME_BUCKET)
-                nome_arquivo_hardware = f"hardware-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
+                upload_file(file_name="hardware-csvs/"+nome_arquivo_hardware, bucket=NOME_BUCKET, object_name="hardware/"+nome_arquivo_hardware)
+                nome_arquivo_hardware = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
                 enviado_para_bucket = True
         else:
-            df.to_csv(nome_arquivo_hardware, index=False, sep=';')
+            df.to_csv("hardware-csvs/"+nome_arquivo_hardware, index=False, sep=';')
 
         if CAPTURAR_PROCESSOS:
-            if os.path.exists(nome_arquivo_processos):
-                df_processes.to_csv(nome_arquivo_processos, sep=";", mode="a", index=False, header=False)
+            if os.path.exists("processes-csvs/"+nome_arquivo_processos):
+                df_processes.to_csv("processes-csvs/"+nome_arquivo_processos, sep=";", mode="a", index=False, header=False)
 
                 if enviado_para_bucket:
                     enviado_para_bucket = False
-                    upload_file(file_name=nome_arquivo_processos, bucket=NOME_BUCKET)
-                    nome_arquivo_processos = f"processes-csvs/{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
+                    upload_file(file_name="processes-csvs/"+nome_arquivo_processos, bucket=NOME_BUCKET, object_name="processes/"+nome_arquivo_hardware)
+                    nome_arquivo_processos = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
             else:
-                df_processes.to_csv(nome_arquivo_processos, index=False, sep=';')
+                df_processes.to_csv("processes-csvs/"+nome_arquivo_processos, index=False, sep=';')
     except OSError as e:
         print(e)
         print("INSIRA O CÓDIGO DA MÁQUINA CORRETAMENTE!!!")
