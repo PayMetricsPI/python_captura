@@ -7,13 +7,13 @@ import os
 from random import randint, gauss, uniform
 from bucket import upload_file
 
-CODIGO_MAQUINA = "<insira o código da máquina>"
+CODIGO_MAQUINA = "COD004"
 
 QTD_MAX_LINHAS = 100  # -1 para infinito
 SIMULAR_REGRA_NEGOCIO = True
 CAPTURAR_PROCESSOS = False
 
-ENVIAR_PARA_BUCKET = True
+ENVIAR_PARA_BUCKET = False
 ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS = 20
 NOME_BUCKET = "raw-paymetrics"
 
@@ -58,14 +58,21 @@ while True:
     active_processes = len(list(psutil.process_iter(['name'])))
 
     mac_address = None
+
     for iface, detalhes in psutil.net_if_addrs().items():
         for espec in detalhes:
-            if platform.system() == 'Windows':
-                if iface == 'Ethernet' and mac_address is None:
+            if espec.family == psutil.AF_LINK:
+                if iface.lower().startswith(("lo", "docker", "veth", "br-", "vmnet")):
+                    continue
+                if platform.system() == 'Windows':
+                    if iface.lower() in ('ethernet', 'wi-fi') or espec.address.count(':') == 5:
+                        mac_address = espec.address
+                        break
+                else:
                     mac_address = espec.address
-            else:
-                if iface.startswith(("eth", "enp", "ens")) and mac_address is None:
-                    mac_address = espec.address
+                    break
+        if mac_address:
+            break
 
     timestamp = time.time()
     data_formatada = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
@@ -84,6 +91,8 @@ while True:
     disk_percent = psutil.disk_usage('/').percent
     bytes_enviados = round(bytes_enviados, 3)
     bytes_recebidos = round(bytes_recebidos, 3)
+
+    boot_time = psutil.boot_time()
 
     if SIMULAR_REGRA_NEGOCIO:
         frac = qtd_linha_atual / QTD_MAX_LINHAS
@@ -117,7 +126,8 @@ while True:
         "disco": [disk_percent],
         "mb_enviados": [bytes_enviados],
         "mb_recebidos": [bytes_recebidos],
-        "processos_ativos": [active_processes]
+        "processos_ativos": [active_processes],
+        "tempo_boot": [boot_time]
     }
 
     df = pd.DataFrame(geral)
