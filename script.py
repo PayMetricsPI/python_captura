@@ -11,7 +11,7 @@ CODIGO_MAQUINA = "<insira o código da máquina>"
 
 QTD_MAX_LINHAS = 100  # -1 para infinito
 SIMULAR_REGRA_NEGOCIO = True
-CAPTURAR_PROCESSOS = True
+CAPTURAR_PROCESSOS = False
 
 ENVIAR_PARA_BUCKET = True
 ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS = 20
@@ -88,17 +88,17 @@ while True:
     if SIMULAR_REGRA_NEGOCIO:
         frac = qtd_linha_atual / QTD_MAX_LINHAS
         fator_pico = 1 + 4 * (frac ** 2)  # cresce exponencialmente ate 5x
-        if randint(0, QTD_MAX_LINHAS // 10) == 0:  # pico surpresa (mander uma aleatoriedade)
-            fator_pico *= uniform(1.5, 3.0)
+        if randint(0, QTD_MAX_LINHAS // 10) == 0:  # pico surpresa (mander uma certa aleatoriedade)
+            fator_pico *= uniform(1.5, 4)
 
         # aumentando cpu, ram e disco atraves do "frac" e "fator_pico" gerando uma correlação
         cpu_percent = cpu_percent * fator_pico + gauss(0, 5)
-        ram_percent = ram_percent * (1 + 0.5 * (frac ** 1.5)) + cpu_percent * 0.1 + gauss(0, 3)
+        ram_percent = ram_percent * (1 + 0.5 * (frac ** 1.4)) + cpu_percent * 0.1 + gauss(0, 3)
         disk_percent = disk_percent * (1 + 0.3 * (frac ** 1.2)) + gauss(0, 2)
 
         # rede cresce proporcionalmente ao pico
-        bytes_enviados *= fator_pico * uniform(1.1, 1.5)
-        bytes_recebidos *= fator_pico * uniform(1.1, 1.5)
+        bytes_enviados = ((bytes_enviados + 0.1) + fator_pico * (ram_percent*0.1) + (cpu_percent*0.1)) / uniform(1, 3)
+        bytes_recebidos = (bytes_recebidos + 0.1) + fator_pico * (ram_percent*0.1) + (cpu_percent*0.1)
 
         # para que nao passe dos limites (0 - 100)
         cpu_percent = min(100, max(0, cpu_percent))
