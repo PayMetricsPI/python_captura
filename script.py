@@ -6,6 +6,7 @@ import platform
 import os
 from random import randint, gauss, uniform
 from bucket import upload_file
+import requests
 
 CODIGO_MAQUINA = "COD004"
 
@@ -16,6 +17,9 @@ CAPTURAR_PROCESSOS = False
 ENVIAR_PARA_BUCKET = False
 ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS = 20
 NOME_BUCKET = "raw-paymetrics"
+
+ENVIAR_PARA_WEBDATAVIZ = True
+URL_WEBDATAVIZ = "http://localhost:3333"
 
 qtd_linha_atual = 0
 
@@ -129,6 +133,20 @@ while True:
         "processos_ativos": [active_processes],
         "tempo_boot": [boot_time]
     }
+
+    if ENVIAR_PARA_WEBDATAVIZ:
+        requests.post(f"{URL_WEBDATAVIZ}/metrica/set", data={
+            "datetime": data_formatada,
+            "codMaquina": CODIGO_MAQUINA,
+            "cpu": cpu_percent,
+            "ram": ram_percent,
+            "disco": disk_percent,
+            "mac": mac_address,
+            "mbEnviados": bytes_enviados,
+            "mbRecebidos": bytes_recebidos,
+            "processos": active_processes,
+            "tempoBoot": boot_time
+        })
 
     df = pd.DataFrame(geral)
     if CAPTURAR_PROCESSOS:
