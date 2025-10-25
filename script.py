@@ -8,7 +8,7 @@ from random import randint, gauss, uniform
 from bucket import upload_file
 import requests
 
-CODIGO_MAQUINA = "COD004"
+CODIGO_MAQUINA = "COD666"
 
 QTD_MAX_LINHAS = 100  # -1 para infinito
 SIMULAR_REGRA_NEGOCIO = True
@@ -18,7 +18,9 @@ ENVIAR_PARA_BUCKET = False
 ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS = 20
 NOME_BUCKET = "raw-paymetrics"
 
-ENVIAR_PARA_WEBDATAVIZ = True
+ENVIAR_PARA_WEBDATAVIZ_REALTIME = True
+ENVIAR_PARA_WEBDATAVIZ_INSERIR_NO_BUCKET = True
+ENVIAR_PARA_WEBDATAVIZ_INSERIR_NO_BUCKET_A_CADA_QTD_LINHAS = 10
 URL_WEBDATAVIZ = "http://localhost:3333"
 
 qtd_linha_atual = 0
@@ -134,7 +136,7 @@ while True:
         "tempo_boot": [boot_time]
     }
 
-    if ENVIAR_PARA_WEBDATAVIZ:
+    if ENVIAR_PARA_WEBDATAVIZ_REALTIME:
         requests.post(f"{URL_WEBDATAVIZ}/metrica/set", data={
             "datetime": data_formatada,
             "codMaquina": CODIGO_MAQUINA,
@@ -147,6 +149,7 @@ while True:
             "processos": active_processes,
             "tempoBoot": boot_time
         })
+        print("Enviando dados em tempo real para WebDataViz")
 
     df = pd.DataFrame(geral)
     if CAPTURAR_PROCESSOS:
@@ -157,8 +160,20 @@ while True:
         if os.path.exists("hardware-csvs/"+nome_arquivo_hardware):
             df.to_csv("hardware-csvs/"+nome_arquivo_hardware, sep=';', mode='a', index=False, header=False)
 
+            if ENVIAR_PARA_WEBDATAVIZ_INSERIR_NO_BUCKET and ((qtd_linha_atual+1) % ENVIAR_PARA_WEBDATAVIZ_INSERIR_NO_BUCKET_A_CADA_QTD_LINHAS == 0):
+                with open("hardware-csvs/"+nome_arquivo_hardware, "r") as file:
+                    content = file.read()
+
+                requests.post(URL_WEBDATAVIZ+"/s3/uploadCSV", data={
+                    "csvRaw": content,
+                    "csvName": "hardware/"+nome_arquivo_hardware
+                })
+                print("Enviando CSV <hardware> para WebDataViz...")
+                nome_arquivo_hardware = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
+                enviado_para_bucket=True
+
             if ENVIAR_PARA_BUCKET and ((qtd_linha_atual+1) % ENVIAR_PARA_BUCKET_A_CADA_QTD_LINHAS == 0):
-                print("Enviando para o Bucket...")
+                print("Enviando CSV para o Bucket...")
                 upload_file(file_name="hardware-csvs/"+nome_arquivo_hardware, bucket=NOME_BUCKET, object_name="hardware/"+nome_arquivo_hardware)
                 nome_arquivo_hardware = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-hardware.csv"
                 enviado_para_bucket = True
@@ -170,9 +185,23 @@ while True:
                 df_processes.to_csv("processes-csvs/"+nome_arquivo_processos, sep=";", mode="a", index=False, header=False)
 
                 if enviado_para_bucket:
-                    enviado_para_bucket = False
-                    upload_file(file_name="processes-csvs/"+nome_arquivo_processos, bucket=NOME_BUCKET, object_name="processes/"+nome_arquivo_processos)
-                    nome_arquivo_processos = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
+                    if ENVIAR_PARA_WEBDATAVIZ_INSERIR_NO_BUCKET:
+                        with open("processes-csvs/"+nome_arquivo_processos, "r") as file:
+                            content = file.read()
+
+                        requests.post(URL_WEBDATAVIZ+"/s3/uploadCSV", data={
+                            "csvRaw": content,
+                            "csvName": "processes/"+nome_arquivo_processos
+                        })
+
+                        print("Enviando CSV <processos> para WebDataViz...")
+                        nome_arquivo_processos = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
+                        enviado_para_bucket=False
+
+                    if ENVIAR_PARA_BUCKET:
+                        enviado_para_bucket = False
+                        upload_file(file_name="processes-csvs/"+nome_arquivo_processos, bucket=NOME_BUCKET, object_name="processes/"+nome_arquivo_processos)
+                        nome_arquivo_processos = f"{datetime.now().strftime("%Y-%m-%d %H-%M-%S")}-{CODIGO_MAQUINA}-processes.csv"
             else:
                 df_processes.to_csv("processes-csvs/"+nome_arquivo_processos, index=False, sep=';')
     except OSError as e:
